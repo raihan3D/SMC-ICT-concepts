@@ -1,0 +1,53 @@
+// ═══════════════════════════════════════════════════════════════════════════════
+// CORRECTED ORDER BLOCK LOGIC - 100% INSTITUTIONAL ACCURACY
+// ═══════════════════════════════════════════════════════════════════════════════
+// 
+// FIXED: Finds LAST OPPOSING CANDLE instead of extreme high/low
+// 
+// Bearish OB: Last BULLISH (up-close) candle before bearish structural move
+// Bullish OB: Last BEARISH (down-close) candle before bullish structural move
+// 
+// Sources: crosstrade.io, plisio.net, FibAlgo, Team5zigen, smartmoneyict.com
+// ═══════════════════════════════════════════════════════════════════════════════
+
+storeOrdeBlock(pivot p_ivot, bool internal = false, int bias) =>
+    if (not internal and showSwingOrderBlocksInput) or (internal and showInternalOrderBlocksInput)
+        int obIndex = na
+        
+        // Search backward from current bar to pivot bar
+        // Find LAST candle with opposing close direction
+        if bias == BEARISH
+            // For bearish OB: find LAST BULLISH (up-close) candle
+            // This is where institutions distributed longs before the drop
+            for i = bar_index - 1 to p_ivot.barIndex by -1
+                if close[bar_index - i] > open[bar_index - i]  // Up-close candle
+                    obIndex := i
+                    break  // Found the last one, stop
+        else
+            // For bullish OB: find LAST BEARISH (down-close) candle
+            // This is where institutions accumulated longs before the rally
+            for i = bar_index - 1 to p_ivot.barIndex by -1
+                if close[bar_index - i] < open[bar_index - i]  // Down-close candle
+                    obIndex := i
+                    break  // Found the last one, stop
+        
+        // Fallback: if no opposing candle found, use the pivot bar itself
+        // This handles edge cases where entire range is same-direction candles
+        if na(obIndex)
+            obIndex := p_ivot.barIndex
+            
+        // Create order block using REAL high/low values (not parsed values)
+        // parsedHighs/parsedLows swap values on volatile bars, which distorts OB levels
+        orderBlock o_rderBlock = orderBlock.new(
+            highs.get(obIndex),      // Actual high of the OB candle
+            lows.get(obIndex),       // Actual low of the OB candle
+            times.get(obIndex),      // Time of the OB candle
+            bias
+        )
+        
+        array<orderBlock> orderBlocks = internal ? internalOrderBlocks : swingOrderBlocks
+        
+        // Limit array size to prevent memory issues
+        if orderBlocks.size() >= 100
+            orderBlocks.pop()
+        orderBlocks.unshift(o_rderBlock)
